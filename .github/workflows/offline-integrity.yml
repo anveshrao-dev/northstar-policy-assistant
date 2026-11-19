@@ -1,0 +1,34 @@
+name: Offline integrity (stdlib only)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax, package layout and direct dependency pins
+        run: python -I -S -B scripts/check_source.py
+      - name: Frozen evaluation and source hashes
+        run: python -I -S -B scripts/validate_evaluations.py
+      - name: Dependency-free validator regressions
+        run: |
+          python -I -S -B -m unittest discover -s tests -p test_validate_evaluations.py -v
+          python -I -S -B -m unittest discover -s tests -p test_source_checks.py -v
+      - name: Shell syntax (do not execute launchers)
+        run: |
+          for script in scripts/*.sh; do
+            bash -n "$script" || exit 1
+          done
