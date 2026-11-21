@@ -1,6 +1,6 @@
 """Reusable Q&A orchestration. Imports perform no credential, model or network IO."""
 from contextlib import contextmanager, ExitStack
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime, timezone
 import os
 from pathlib import Path
@@ -340,7 +340,8 @@ class QAService:
 
 
 @contextmanager
-def open_retriever(root: Path, backend: str, *, strategy: str = "dense", snapshot_id: str | None = None):
+def open_retriever(root: Path, backend: str, *, strategy: str = "dense", snapshot_id: str | None = None,
+                   pinecone_binding: dict | None = None):
     """Verified retrieval; an explicit snapshot pins Pinecone's active generation.
 
     Never index/provision, switch publication, or regenerate document vectors.
@@ -348,6 +349,11 @@ def open_retriever(root: Path, backend: str, *, strategy: str = "dense", snapsho
     root = validate_project_root(root)
     if strategy not in ("dense", "bm25", "hybrid") or backend not in ("chroma", "pinecone"):
         raise GenerationError("unsupported retrieval backend or strategy")
+    if pinecone_binding is not None:
+        from .development_backend import check_publication
+        if backend != 'pinecone' or strategy != 'dense' or snapshot_id != pinecone_binding.get('snapshot_id'):
+            raise GenerationError('retrieval differs from approved backend capability')
+        check_publication(root, pinecone_binding)
     if strategy != "dense":
         from northstar_atlas.vector_store.catalog import load_catalog
         from northstar_atlas.vector_store.bm25 import BM25Store
@@ -374,11 +380,16 @@ def open_retriever(root: Path, backend: str, *, strategy: str = "dense", snapsho
         from northstar_atlas.vector_store.pinecone_workflow import RequestMeter, active_snapshot, connect_target, open_store
         settings = pinecone_settings(root)
         check_confirmation(root, settings)
+        if pinecone_binding is not None and any(getattr(settings,k) != v
+                for k,v in pinecone_binding['target'].items() if k != 'host'):
+            raise GenerationError('configured target differs from approved backend capability')
         meter = RequestMeter()
         with sdk_client(settings) as client:
             meter.attach(client)
             target, index = connect_target(client, meter, settings, read_only=True)
             with index:
+                if pinecone_binding is not None and asdict(target) != pinecone_binding['target']:
+                    raise GenerationError('remote target differs from approved backend capability')
                 snapshot = active_snapshot(root, target)
                 if snapshot_id is not None and snapshot.snapshot_id != snapshot_id:
                     raise GenerationError("active Pinecone snapshot differs from requested snapshot")
@@ -421,6 +432,15 @@ def open_qa_service(root: Path, *, backend: str | None = None, provider: LLMProv
                 budget.check_ready()
             else:
                 reservation.check_coordinator(budget)
+        retrieval_options = {}
+        if paid_provider:
+            from .local_development import DevelopmentBudget
+            if isinstance(budget, DevelopmentBudget):
+                if strategy != 'dense':
+                    raise QAConfigurationError()
+                retrieval_options = budget.retrieval_options(selected)
+                if snapshot_id is not None and retrieval_options.get('snapshot_id', snapshot_id) != snapshot_id:
+                    raise QAConfigurationError()
         if provider is not None and not callable(getattr(provider, "generate", None)):
             raise QAConfigurationError()
         if provider is None:
@@ -431,7 +451,9 @@ def open_qa_service(root: Path, *, backend: str | None = None, provider: LLMProv
             if settings.model != model:
                 raise QAConfigurationError()
             provider = resources.enter_context(NebiusProvider(settings, allow_paid=True, max_attempts=1, requires_budget=True))
-        options = {} if strategy == "dense" else {"strategy": strategy, "snapshot_id": snapshot_id}
+        options = {} if strategy == "dense" else {"strategy": strategy}
+        if snapshot_id is not None: options['snapshot_id'] = snapshot_id
+        options.update(retrieval_options)
         store, embedder, fingerprint = resources.enter_context(open_retriever(root, selected, **options))
         service = QAService(store, embedder, provider, corpus_fingerprint=fingerprint, backend=selected,
                             model=model, strategy=strategy, budget=budget)

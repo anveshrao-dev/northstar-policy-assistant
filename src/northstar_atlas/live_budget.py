@@ -614,6 +614,13 @@ class WorkflowReservation:
         budget._paths()
         _require(self._flow['profile'] == profile and self._flow['backend'] == backend)
         self._budget._validate_price(self._price, self._budget.clock())
+        # Coordinators may impose an immutable retrieval capability in addition
+        # to the shared permit. This is a setup/transport gate, not a write or
+        # settlement gate: stale evidence must never prevent conservative closure.
+        check = getattr(budget, 'check_retrieval_binding', None)
+        if check is not None:
+            _require(callable(check))
+            check(backend)
 
     def _save(self):
         try: self._budget._write(self._value)

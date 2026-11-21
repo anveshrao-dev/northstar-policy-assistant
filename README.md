@@ -15,8 +15,10 @@ people find guidance; it does not grant access, approve changes or execute actio
 
 Interactive **Standard RAG on Mac with local Chroma, pinned MiniLM and Nebius has
 been demonstrated live**, including an accepted cited HR transfer-notice answer.
-Pinecone is an optional backend with historical live demonstrations; its current
-HTTPX search path remains live unverified and its publication is incomplete. The optional
+The optional **Pinecone + MiniLM + Nebius** path also completed one verified live
+Standard RAG question on 21 November 2026. Its reviewed 189-record publication was
+ready, and the accepted answer cited HR-001 v1.0 §4.2. These observations do not
+establish general answer accuracy or confirmed billing. The optional
 semantic LangGraph workflow is implemented and tested offline; successful complete
 live execution has not been verified. All policies are synthetic.
 
@@ -24,10 +26,10 @@ live execution has not been verified. All policies are synthetic.
 
 ![Standard RAG architecture: six synthetic policies become 189 MiniLM records; eligible evidence supports controlled Nebius generation and citation validation.](docs/assets/standard-rag-architecture.png)
 
-*The demonstrated Mac path uses local Chroma and pinned MiniLM with controlled
-Nebius generation. Pinecone is an optional integration: record integrity has been
-verified remotely, but current HTTPX search remains live unverified and its
-publication is incomplete.*
+*Both demonstrated Mac paths use pinned local MiniLM embeddings and controlled
+Nebius generation, with Chroma or an independently approved Pinecone publication
+for retrieval. Readiness and authorization are checked for each installation;
+the successful live tests do not provision assets or grant access to a clone.*
 
 The linear `QAService` defaults to dense retrieval and local Chroma; Pinecone is
 explicitly selectable. BM25 and dense/BM25 Reciprocal Rank Fusion are optional.
@@ -163,12 +165,17 @@ alone is not sufficient for controlled hosted use.
 
 ### Optional Pinecone
 
-The latest bounded remote integrity diagnostic verified **189 of 189 records**
-using HTTPX Documents list/fetch. The current HTTPX search path has **not been
-live verified**, and the publication remains **incomplete / failed audit**.
-A successful record audit does not restore readiness or establish query visibility.
-Pinecone is not presented as production-ready; historical SDK search comparisons
-and Replit demonstrations are separate evidence. No restoration is performed at startup.
+The HTTPX Documents list/fetch path verified **189 of 189 records**. A separately
+approved no-upsert restoration then freshly verified record integrity and exact
+query visibility for all 189 records before promoting only the local manifest.
+The active pointer was preserved. Retrieval-only search and one Pinecone-backed
+Nebius answer subsequently succeeded; the reviewed publication remained ready.
+
+These are point-in-time checks of one controlled installation, not unrestricted
+production-readiness evidence. Another checkout requires its own verified assets
+and approvals. Startup never restores readiness. Integrity failures can mark local
+publication metadata incomplete and withhold a result; they do not authorize
+remote vector changes, repair or retry. Historical SDK comparisons remain separate.
 
 Install the `pinecone` extra and supply the four required process variables when
 `.env` is absent: `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `PINECONE_CLOUD` and
@@ -210,24 +217,37 @@ paid use.
 
 ### Controlled local Mac runtime
 
-For a trusted single-user Mac, the demonstrated repeatable development profile
-uses Chroma and an independently approved durable development authority. It does
+For a trusted single-user Mac, the repeatable development profile supports Chroma
+and, after a separately approved capability amendment, Pinecone. Both use the same
+independently approved durable development authority. It does
 not use Replit Private Preview settings or fall back to a historical authority:
 
 ```bash
 bash scripts/run_local_live.sh --approve-local-live --development --backend chroma
+
+# Alternative: only after the Pinecone capability is approved and applied.
+bash scripts/run_local_live.sh --approve-local-live --development --backend pinecone
 ```
 
-Run this only after separate paid-use authorization and configuration of an
+Run only one backend launcher at a time, after separate paid-use authorization and configuration of an
 **existing** compatible authority, current independently verified pricing, cached
-MiniLM and verified retrieval assets. Open `http://127.0.0.1:8501` and give session
+MiniLM and verified retrieval assets. Select the latest applied plan with
+`NORTHSTAR_DEVELOPMENT_PLAN` and derive `NORTHSTAR_DEVELOPMENT_RUN_APPROVAL`
+through `local_development.run_approval` as described in the
+[development procedure](docs/decisions/Local-Development-Authority.md#preparation-activation-and-execution).
+An old plan or a digest without operator approval does not authorize execution.
+Open `http://127.0.0.1:8501` and give session
 consent. Missing accounting or expired pricing stops startup; the launcher never
 creates a ledger or restores remote history. The development profile permits at
 most 100 lifetime attempts and $2.00 cumulative reserved estimated cost, with
 pricing reviewed for one calendar month. These are configured ceilings, not a
 statement of current balance or account-wide spending. Renewal never resets usage.
-This profile disables Pinecone and LangGraph. Other separately authorized profiles
-retain their own contracts. Do not tunnel or publicly forward this local service.
+The lifetime attempts and Nebius reservation ceiling are shared across both
+backends; switching backends creates no new allowance. Pinecone read and egress
+charges are outside that ceiling. The launcher fixes the backend for the session;
+both `approved_only` and `draft_review` remain available. Retrieval-only Policy
+Search remains Chroma-only. This profile disables LangGraph. Other separately
+authorized profiles retain their own contracts. Do not tunnel or publicly forward this local service.
 See the [development setup and approval procedure](docs/decisions/Local-Development-Authority.md)
 and [local access contract](docs/decisions/Local-Controlled-Live-Runtime.md).
 
@@ -269,6 +289,14 @@ source spans or reviewed wording. It withholds unsupported or unreviewed wording
 without rewriting answers or adding model calls. It may reject correct paraphrases
 and does not prove general semantic correctness or completeness. A successful live
 retest of this safeguard is not established.
+
+The verified Pinecone + Nebius test asked how far in advance HR must notify IT
+Operations of a planned internal transfer. One Qwen generator attempt returned
+the accepted **at least two business days** answer with HR-001 v1.0 §4.2 and an
+exact supporting quotation. Sanitized evidence recorded 4,005 input and 160 output
+tokens, durable settlement and result persistence. This single approved-only
+example is not an answer-quality benchmark, a test of the §4.1 actor safeguard,
+or confirmation of provider billing totals.
 
 Historical Replit/Pinecone observations include accepted cited answers, an
 evidence-limited abstention and a withheld HTTP 200 response-envelope failure.

@@ -26,7 +26,7 @@ From the authorized project root:
 ```bash
 pwd
 .venv/bin/python -B scripts/validate_evaluations.py
-.venv/bin/python -B -m unittest discover -s tests -v
+.venv/bin/python -B scripts/test_offline.py
 ```
 
 The existing environment is Python 3.12.15. The validator locates the repository
@@ -34,6 +34,9 @@ from its own script path rather than the caller's current directory. Exit 0 mean
 structural checks passed; errors go to stderr and produce a nonzero exit. It never
 repairs a manifest, rewrites labels, or treats a structural pass as semantic proof.
 Tests use copied fixtures under `.local/tmp/` and remove their temporary copies.
+The guarded runner blocks Python socket access and sets model libraries to offline
+mode. Run it in a credential-free environment; cached-model checks are separate
+opt-in tests, and the Python guard is not an OS sandbox for arbitrary subprocesses.
 `-B` prevents bytecode cache writes. No pytest installation is needed.
 
 ## 2. Categories and Retrieval Modes

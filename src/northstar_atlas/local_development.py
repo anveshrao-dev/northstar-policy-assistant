@@ -113,7 +113,7 @@ class DevelopmentBudget(PersistentBudget):
         _require(isinstance(value, dict) and value.get('version') == 2 and value.get('legacy') is None
                  and 'diagnostic_request_sha256' not in value)
         result = super()._validate_document(value, current=current)
-        _require(all(f['profile'] == LINEAR and f['backend'] == 'chroma' for f in value['workflows']))
+        _require(all(f['profile'] == LINEAR and f['backend'] in ('chroma', 'pinecone') for f in value['workflows']))
         return result
 
     @contextmanager
@@ -130,16 +130,41 @@ class DevelopmentBudget(PersistentBudget):
             _require(self.approval == _sha(_encode(plan)) and self.run_approval == run_approval(self.approval))
             current = self._read()[0]
             _extends(candidate, current)
+            capability = plan.get('pinecone')
+            _history_backends(current, capability)
+            from .live_access import local_backend
+            if local_backend() == 'pinecone':
+                _require(capability is not None)
+                from .development_backend import check_publication
+                check_publication(self.root, capability)
             yield None
 
     @contextmanager
     def reserve(self, request, *, diagnostic_approval=None):
         from .live_access import require_live_budget, require_local_request
         require_live_budget(self.root, self)
-        require_local_request(self.root, backend='chroma', graph=False)
-        _require(request.profile == LINEAR and request.backend == 'chroma' and len(request.question) <= 2000)
+        require_local_request(self.root, backend=request.backend, graph=False)
+        _require(request.profile == LINEAR and request.backend in ('chroma', 'pinecone') and len(request.question) <= 2000)
         with super().reserve(request, diagnostic_approval=diagnostic_approval) as reservation:
             yield reservation
+
+    def check_retrieval_binding(self, backend):
+        if backend == 'pinecone':
+            self.retrieval_options(backend)
+
+    def retrieval_options(self, backend):
+        # Called only after the coordinator's reservation/access checks. Recheck
+        # the selected immutable approval before credentials or resource setup.
+        self._paths()
+        plan, _, _, _ = _chain(self, current=True)
+        _require(self.approval == _sha(_encode(plan)) and self.run_approval == run_approval(self.approval))
+        if backend == 'chroma':
+            return {}
+        _require(backend == 'pinecone' and plan.get('pinecone') is not None)
+        from .development_backend import check_publication
+        capability = plan['pinecone']
+        check_publication(self.root, capability)
+        return dict(snapshot_id=capability['snapshot_id'], pinecone_binding=deepcopy(capability))
 
     def check_ready(self, *, profile=None):
         _require(profile in (None, LINEAR))
@@ -152,6 +177,11 @@ class DevelopmentBudget(PersistentBudget):
             remaining = 100-state.attempts_consumed
             money = Decimal('2')-state.reserved_usd
             return Capacity(remaining, state.reserved_usd, money, cost, remaining > 0 and money >= cost)
+
+
+def _history_backends(value, capability):
+    allowed = ('chroma',) if capability is None else ('chroma', 'pinecone')
+    _require(all(f['backend'] in allowed for f in value['workflows']))
 
 
 def _extends(previous, current):
@@ -181,6 +211,12 @@ def _packet(b, directory, *, previous=None, current=False):
     source = _decode(source_raw)
     number = int(directory.name[7:])
     binding = _bindings(b)
+    capability = plan.get('pinecone')
+    if capability is not None:
+        from .development_backend import validate_binding
+        validate_binding(capability)
+        binding['pinecone'] = capability
+    _history_backends(candidate, capability)
     _require(plan == dict(binding, revision=number, parent_plan_sha256=previous[0] if previous else None,
         source_sha256=_sha(source_raw), source_ledger_identity=plan.get('source_ledger_identity'),
         candidate_sha256=_sha(candidate_raw), pricing_sha256=_sha(_encode(candidate['pricing_revisions'][-1])),
@@ -189,19 +225,26 @@ def _packet(b, directory, *, previous=None, current=False):
     ident = plan['source_ledger_identity']
     _require(isinstance(ident, list) and len(ident)==2 and all(type(v) is int and v >= 0 for v in ident))
     if previous is None:
-        _require(number == 0 and source == candidate and candidate['workflows'] == []
+        _require(capability is None and number == 0 and source == candidate and candidate['workflows'] == []
                  and len(candidate['pricing_revisions']) == 1)
     else:
         _require(number > 0)
         b._validate_document(source, current=False)
         _extends(previous[1], source)
         _require(not any(f['status']=='reserved' for f in source['workflows']))
-        expected = deepcopy(source)
-        expected['pricing_revisions'].append(candidate['pricing_revisions'][-1])
-        expected['active_pricing'] = candidate['pricing_revisions'][-1]['id']
-        _require(candidate == expected and plan['scope_review_sha256'] == previous[2])
-        old_price = next(p for p in source['pricing_revisions'] if p['id'] == source['active_pricing'])
-        _require(_timestamp(candidate['pricing_revisions'][-1]['confirmed_at']) > _timestamp(old_price['confirmed_at']))
+        _history_backends(source, previous[3])
+        _require(plan['scope_review_sha256'] == previous[2])
+        if previous[3] is None and capability is not None:
+            # An amendment changes capability only, never accounting or pricing.
+            _require(candidate == source)
+        else:
+            _require(capability == previous[3])
+            expected = deepcopy(source)
+            expected['pricing_revisions'].append(candidate['pricing_revisions'][-1])
+            expected['active_pricing'] = candidate['pricing_revisions'][-1]['id']
+            _require(candidate == expected)
+            old_price = next(p for p in source['pricing_revisions'] if p['id'] == source['active_pricing'])
+            _require(_timestamp(candidate['pricing_revisions'][-1]['confirmed_at']) > _timestamp(old_price['confirmed_at']))
     _require(candidate['active_pricing'] == candidate['pricing_revisions'][-1]['id'])
     cost = _estimate(prices[candidate['active_pricing']], 30720, 2048)
     _require(state.attempts_consumed < 100 and state.reserved_usd + cost <= Decimal('2'))
@@ -216,7 +259,7 @@ def _chain(b, *, current, allow_pending=False):
         plan, candidate, cost = _packet(b, directory, previous=previous, current=current and last)
         if not (last and allow_pending):
             _require(_read_private(b, directory/'applied.json') == _receipt(plan))
-        previous = (_sha(_encode(plan)), candidate, plan['scope_review_sha256'])
+        previous = (_sha(_encode(plan)), candidate, plan['scope_review_sha256'], plan.get('pinecone'))
         if index == 0 and not (last and allow_pending):
             _require(_read_private(b, b.directory/ACTIVATION) == _receipt(plan))
     return plan, candidate, cost, entries[-1]
@@ -239,13 +282,14 @@ def open_review(root, *, approval=None, run_approval=None, clock=_now):
     return b
 
 
-def _write_packet(b, number, source, candidate, scope_review, parent):
+def _write_packet(b, number, source, candidate, scope_review, parent, *, pinecone=None):
     directory=b.directory/f'review-{number:04d}'
     _require(not os.path.lexists(directory))
     plan=dict(_bindings(b), revision=number, parent_plan_sha256=parent,
         source_sha256=_sha(source), source_ledger_identity=_identity(b.path),
         candidate_sha256=_sha(_encode(candidate)),
         pricing_sha256=_sha(_encode(candidate['pricing_revisions'][-1])), scope_review_sha256=scope_review)
+    if pinecone is not None: plan['pinecone'] = deepcopy(pinecone)
     directory.mkdir(mode=0o700); _sync(b.directory)
     for name, raw in (('source.json',source), ('candidate.json',_encode(candidate)), ('plan.json',_encode(plan))):
         _write_private(b,directory/name,raw)
@@ -299,9 +343,30 @@ def prepare_renewal(b, pricing, *, previous_plan_sha256, verified_pricing_sha256
         _require(not any(f['status']=='reserved' for f in value['workflows']))
         value['pricing_revisions'].append(deepcopy(pricing)); value['active_pricing']=pricing['id']
         b._validate_document(value)
-        plan=_write_packet(b,previous['revision']+1,source,value,previous['scope_review_sha256'],previous_plan_sha256)
+        plan=_write_packet(b,previous['revision']+1,source,value,previous['scope_review_sha256'],previous_plan_sha256,
+                           pinecone=previous.get('pinecone'))
         _,_,cost,_=_chain(b,current=True,allow_pending=True)
     return Preview(_sha(_encode(plan)),plan['candidate_sha256'],str(cost))
+
+
+def prepare_pinecone(b, *, publication_id, previous_plan_sha256, scope_review_sha256,
+                     approve_preparation, writers_stopped):
+    """Prepare one capability amendment; no credential load, ledger write or remote IO."""
+    _require(approve_preparation is True and writers_stopped is True)
+    for digest in (publication_id, previous_plan_sha256, scope_review_sha256): _digest(digest)
+    from .development_backend import capture_publication
+    with b._physical_lock():
+        _require(not os.path.lexists(b.directory/PREPARING))
+        previous, candidate, _, _ = _chain(b, current=True)
+        _require(_sha(_encode(previous)) == previous_plan_sha256 and previous.get('pinecone') is None)
+        source = b._read_bytes(); value, _, _ = b._validate_document(_decode(source))
+        _extends(candidate, value); _history_backends(value, None)
+        _require(not any(f['status'] == 'reserved' for f in value['workflows']))
+        capability = dict(capture_publication(b.root, publication_id), review_sha256=scope_review_sha256)
+        plan = _write_packet(b, previous['revision']+1, source, value,
+            previous['scope_review_sha256'], previous_plan_sha256, pinecone=capability)
+        _, _, cost, _ = _chain(b, current=True, allow_pending=True)
+        return Preview(_sha(_encode(plan)), plan['candidate_sha256'], str(cost))
 
 
 def apply(b, *, approved_plan_sha256, approved_candidate_sha256, approve_application, writers_stopped):
@@ -312,6 +377,11 @@ def apply(b, *, approved_plan_sha256, approved_candidate_sha256, approve_applica
         _require(_sha(_encode(plan))==approved_plan_sha256 and plan['candidate_sha256']==approved_candidate_sha256
                  and _sha(b._read_bytes())==plan['source_sha256'] and _identity(b.path)==plan['source_ledger_identity']
                  and not os.path.lexists(directory/'applied.json'))
+        # Fresh publication approval is required for the backend amendment.
+        # Ordinary pricing renewal must not disable Chroma when Pinecone is down.
+        if plan.get('pinecone') is not None and plan['source_sha256'] == plan['candidate_sha256']:
+            from .development_backend import check_publication
+            check_publication(b.root, plan['pinecone'])
         initial=plan['revision']==0
         _require(os.path.lexists(b.directory/PREPARING)==initial)
         if initial:
@@ -348,7 +418,7 @@ def _selection():
 def configured_development(root):
     from .live_access import local_backend, operator_access_authorized
     from .one_shot import one_shot_selected
-    _require(os.environ.get(ENV)=='1' and local_backend()=='chroma' and operator_access_authorized()
+    _require(os.environ.get(ENV)=='1' and local_backend() in ('chroma','pinecone') and operator_access_authorized()
              and not one_shot_selected() and os.environ.get('NORTHSTAR_DEMO_BATCH_ENABLED','0')=='0'
              and os.environ.get('NORTHSTAR_UI_ENABLE_GRAPH','0')=='0'
              and not any(k in os.environ for k in ('NORTHSTAR_BUDGET_AUTHORITY_ROOT',
@@ -377,13 +447,17 @@ def _review_price(root, relative):
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     commands=parser.add_subparsers(dest='action',required=True)
-    for action in ('prepare','prepare-renewal','apply'):
+    for action in ('prepare','prepare-renewal','prepare-pinecone','apply'):
         cmd=commands.add_parser(action)
         cmd.add_argument('--writers-stopped',action='store_true',required=True)
         if action=='apply':
             for name in ('approved-plan-sha256','approved-candidate-sha256'):
                 cmd.add_argument('--'+name,required=True)
             cmd.add_argument('--approve-application',action='store_true',required=True)
+        elif action=='prepare-pinecone':
+            for name in ('publication-id','previous-plan-sha256','scope-review-sha256'):
+                cmd.add_argument('--'+name,required=True)
+            cmd.add_argument('--approve-preparation',action='store_true',required=True)
         else:
             for name in ('pricing-file','verified-pricing-sha256',
                          'scope-review-sha256' if action=='prepare' else 'previous-plan-sha256'):
@@ -397,6 +471,11 @@ def main(argv=None):
                   approved_candidate_sha256=args.approved_candidate_sha256,
                   approve_application=args.approve_application,writers_stopped=args.writers_stopped)
             print('Approved development candidate applied. Separate local execution approval is required.')
+        elif args.action=='prepare-pinecone':
+            result=prepare_pinecone(open_review(root),publication_id=args.publication_id,
+                previous_plan_sha256=args.previous_plan_sha256,scope_review_sha256=args.scope_review_sha256,
+                approve_preparation=args.approve_preparation,writers_stopped=args.writers_stopped)
+            print(_encode(asdict(result)).decode())
         else:
             price=_review_price(root,args.pricing_file)
             common=dict(verified_pricing_sha256=args.verified_pricing_sha256,

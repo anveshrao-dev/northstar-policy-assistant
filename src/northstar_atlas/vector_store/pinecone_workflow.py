@@ -285,7 +285,7 @@ def save_failure_report(root: Path, command: str, stage: str, diagnostic) -> Pat
 
 def _save_private_report(root: Path, suffix: str, value: dict) -> Path:
     """Shared durable writer; callers validate their fixed report schemas first."""
-    if suffix not in ("search-failure", "status-failure", "smoke-failure", "diagnostic-audit"):
+    if suffix not in ("search-failure", "status-failure", "smoke-failure", "diagnostic-audit", "restoration"):
         raise ValueError("invalid private report kind")
     raw = json.dumps(value, indent=2, allow_nan=False) + "\n"
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")

@@ -313,8 +313,8 @@ class ResourceOwner:
     def development_status(self):
         try:
             from northstar_atlas.local_development import configured_development, DevelopmentBudget
-            from northstar_atlas.live_access import require_local_request
-            require_local_request(self.root, backend='chroma', graph=False)
+            from northstar_atlas.live_access import require_local_request, local_backend
+            require_local_request(self.root, backend=local_backend(), graph=False)
             configured = configured_development(self.root)
             if self._budget is None:
                 self._budget = configured
@@ -331,7 +331,8 @@ class ResourceOwner:
         from northstar_atlas.live_budget import WorkflowRequest, LINEAR, BudgetError
         if request.workflow != STANDARD_WORKFLOW:
             return error_view('workflow_disabled')
-        if request.backend != 'chroma':
+        from northstar_atlas.live_access import local_backend
+        if request.backend != local_backend():
             return error_view('backend_disabled')
         status = self.development_status()
         if status is None:

@@ -55,21 +55,35 @@ sessions, reloads and process restarts.
 ## Mac development startup
 
 Use the existing locked Python 3.12 environment with UI/LLM dependencies and pinned
-MiniLM assets. Chroma must already be initialized and source-compatible. The
+local MiniLM assets. For Chroma, its local index must already be initialized and
+source-compatible. For Pinecone, include the Pinecone extra and independently
+reviewed credential/owner configuration, a ready publication and its applied
+development capability. Credentials and runtime state are not distributed with
+the source repository. The
 contained `.local/tmp`, `.local/cache` and `.venv/bin` paths must exist; the launcher
 does not fall back to global temporary directories.
 
 Prepare, independently review and activate a distinct authority using the
 [development procedure](Local-Development-Authority.md). Then separately authorize
-paid execution, select its approved plan/run binding, and launch:
+paid execution, select the **latest applied** plan using
+`NORTHSTAR_DEVELOPMENT_PLAN`, and derive its matching
+`NORTHSTAR_DEVELOPMENT_RUN_APPROVAL` through `local_development.run_approval`.
+The [development procedure](Local-Development-Authority.md#preparation-activation-and-execution)
+shows the exact selection template. Missing or stale selections deny startup;
+changing PATH cannot supply authority approval. Launch one selected backend:
 
 ```bash
 bash scripts/run_local_live.sh --approve-local-live --development --backend chroma
+
+# Alternative after independent Pinecone capability approval/application:
+bash scripts/run_local_live.sh --approve-local-live --development --backend pinecone
 ```
 
 Open `http://127.0.0.1:8501`, select Live Q&A, choose the permitted policy mode and
 enable paid answers for that session. No question is submitted automatically.
-The default Offline Demo and retrieval-only Policy Search remain separate.
+The default Offline Demo and Chroma-only retrieval-only Policy Search remain
+separate. The Live Q&A backend is fixed by the launcher; policy modes remain
+`approved_only` and `draft_review`.
 
 Startup validates the authority and current pricing without initiating inference.
 Credential and backend checks at reserved resource setup still apply; a healthy
@@ -78,8 +92,16 @@ accounting, downloads models, builds an index, renews pricing or changes limits.
 
 ## Profile and authority isolation
 
-Development mode is LINEAR/Chroma only. It rejects graph, Pinecone, batch, one-shot,
-handoff and external-authority selectors. Generic controlled-local and supported
+Development mode is LINEAR with Chroma, or Pinecone after an independently
+approved capability amendment. Both backends share the 100-attempt lifetime
+allowance and $2 cumulative Nebius reserved-estimate ceiling. No backend switch
+or amendment releases historical uncertain spending. Pinecone read/egress charges
+are outside that ceiling. The Pinecone capability binds the exact publication,
+target, namespace, frozen snapshot, corpus and local file identities. Changed
+bindings block Pinecone execution; there is no alternate-target fallback.
+
+Development mode rejects graph, batch, one-shot, handoff and external-authority
+selectors. Generic controlled-local and supported
 legacy one-shot/hosted profiles retain their separate approval contracts; there is
 no fallback from a missing or spent one-shot to a larger batch.
 
@@ -116,8 +138,10 @@ sandbox for arbitrary external programs. Cached-model integration is opt-in and
 must use verified local assets without downloading. See [offline integrity](Offline-Integrity-Checks.md)
 and [Chroma isolation](Secure-Chroma-Initialization.md).
 
-Live Mac Standard RAG has been demonstrated; complete live semantic LangGraph has
-not. Known timeout, response-envelope and semantic-attribution limitations are
+Live Mac Standard RAG has been demonstrated with Chroma and with one verified
+Pinecone-backed Nebius HR notice question. This does not establish general answer
+correctness or confirmed billing. Complete live semantic LangGraph has not been
+verified. Known timeout, response-envelope and semantic-attribution limitations are
 summarized in the [architecture guide](../README.md#verification-and-limitations).
 If an authority is guarded, corrupt, expired, identity-mismatched or exhausted,
 stop. Never clear guards, restore older spending records or retry automatically.

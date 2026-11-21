@@ -1,8 +1,9 @@
 # Architecture and verification guide
 
 Northstar Atlas is an enterprise policy Q&A application over six synthetic policy
-documents. Its demonstrated live path is Streamlit → local Chroma and pinned
-MiniLM → Nebius Qwen → validated public response. The [README](../README.md)
+documents. Its demonstrated live Standard RAG paths use Streamlit → Chroma or
+approved Pinecone retrieval with pinned local MiniLM → Nebius Qwen → validated
+public response. The [README](../README.md)
 provides installation and everyday usage; this guide explains component boundaries
 and the evidence supporting current claims.
 
@@ -56,12 +57,14 @@ Chroma stores local supplied vectors and source metadata. Its isolated worker
 startup prevents Chroma's import-time settings initialization from reading an
 unrelated project dotenv file. See [secure initialization](decisions/Secure-Chroma-Initialization.md).
 
-Pinecone is optional. A bounded remote diagnostic verified all 189 records through
-the HTTPX Documents list/fetch path. The current HTTPX search implementation is
-tested offline but remains live unverified; the publication remains incomplete.
-A successful record audit does not establish query visibility or restore readiness.
-Historical SDK search comparisons are separate experiments, not production-readiness
-evidence for the current adapter. No startup path silently repairs a publication.
+Pinecone is optional. HTTPX Documents list/fetch verified all 189 records. A
+separately approved restoration freshly audited every record and its exact query
+visibility before promoting the local manifest to ready without rewriting the
+active pointer or changing remote vectors. A retrieval-only query and one
+Pinecone-backed Nebius Standard RAG answer subsequently succeeded. The reviewed
+publication remained ready at that verification; this is not a promise of future
+remote immutability or readiness in another installation. Historical SDK search
+comparisons remain separate experiments. No startup path silently repairs a publication.
 
 Pinecone requires complete `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`,
 `PINECONE_CLOUD` and `PINECONE_REGION` settings. Process-only configuration is
@@ -80,6 +83,47 @@ confirmed monetary bill. The bounded diagnostic shares a 12-dispatch cap across
 HTTPX describe/list/fetch, with no retry, redirect or SDK fallback. Ordinary
 SDK control-plane workflows are distinct from that diagnostic contract.
 
+### Guarded readiness restoration
+
+Restoration is a separate operation, never a response to a failed question. It
+accepts only an existing owned, active `incomplete` / `failed audit` publication
+with the pinned 189-record snapshot. Local preparation binds the target,
+owner-confirmation metadata, namespace, source/snapshot identity, manifest and
+active-pointer bytes and filesystem identities in a private immutable plan. It
+loads no credential and changes no readiness state. The plan expires after 24
+hours, independently of inference pricing.
+
+Separately approved application requires fresh credential-bound ownership,
+target, record and source checks, plus one exact-record visibility search for
+each record. It uses only HTTPX describe/list/fetch/search with no retries,
+redirects, SDK fallback or vector writes. A shared 200-dispatch cap covers a
+normal 197-dispatch path: two descriptions, two list pages, four fetch batches
+and 189 visibility searches. Additional pagination consumes the same cap. The
+checkpoint deadline and phase timeouts are not a hard wall-clock guarantee.
+Pinecone read/egress charges are independent of Nebius accounting; the request
+cap is not a dollar ceiling.
+
+These templates require separate preparation and live-promotion approval:
+
+```bash
+.venv/bin/python -B -m northstar_atlas.pinecone prepare-restoration \
+  --publication-id "$REVIEWED_PUBLICATION_ID" --approve-preparation
+
+.venv/bin/python -B -m northstar_atlas.pinecone restore-readiness \
+  --publication-id "$REVIEWED_PUBLICATION_ID" \
+  --approved-plan-sha256 "$APPROVED_RESTORATION_PLAN_SHA256" --approve-promotion
+```
+
+The existing publication lock and durable pending guard fence cooperating local
+readers/writers. They cannot fence independent remote writers. Only after every
+check succeeds may the manifest be atomically promoted; a durable receipt/report
+precedes guard removal, and the active pointer is not rewritten. An interrupted
+or uncertain transition remains blocked. Do not retry, clear guards, restore
+older state or infer success from a ready manifest alone. Any recovery, including
+the narrowly supported pre-promotion abort, requires independent review and
+separate authorization. Ordinary retrieval retains its integrity checks and may
+invalidate local readiness on failure; it never restores it automatically.
+
 ## Controlled local execution
 
 The [development profile](decisions/Local-Development-Authority.md) supports a
@@ -91,9 +135,19 @@ Historical one-shot and hosted contracts retain their own shorter pricing polici
 The [local access contract](decisions/Local-Controlled-Live-Runtime.md) requires a
 trusted single-user Mac, numeric loopback binding, direct client/Host/Origin checks,
 explicit operator authorization and per-session consent. Development mode is
-Standard RAG with Chroma; it does not enable Pinecone or LangGraph. Conflicting
+Standard RAG with Chroma or a separately approved, publication-bound Pinecone
+capability; it does not enable LangGraph. The same 100 attempts and $2 Nebius
+reserved-estimate ceiling cover both backends, without releasing uncertain
+reservations. Pinecone read/egress charges are outside that ceiling. Conflicting
 authority/profile selectors fail closed. Restarting or clearing the chat cannot
 reset consumption. Independent clients or hosts can spend outside this local cap.
+
+Startup explicitly selects the latest applied development plan and its derived
+run approval. A capability amendment or pricing renewal invalidates the older
+selection. The external capability-scope document is operator-review evidence:
+the application binds its digest, not an independently enforced document schema.
+The UI backend follows the approved launcher selection; Policy Search remains
+Chroma-only. See the [development procedure](decisions/Local-Development-Authority.md).
 
 ## Optional LangGraph profiles
 
@@ -139,6 +193,11 @@ not be reset, copied into a fresh allowance or automatically repaired.
 
 - Live Mac Standard RAG produced a cited HR transfer-notice answer through local
   Chroma/MiniLM and Nebius. This is not a fifteen-question live accuracy benchmark.
+- On 21 November 2026, one Pinecone/MiniLM/Nebius Standard RAG test returned the
+  accepted two-business-day HR notice answer with HR-001 v1.0 §4.2. Sanitized
+  evidence recorded one generator attempt, 4,005 input / 160 output tokens,
+  settlement and durable result recording. This verifies that integration case,
+  not general faithfulness, billing totals or live semantic LangGraph execution.
 - A live provider timeout produced no accepted answer and retained conservative
   uncertain accounting. New timeout subtypes are covered offline; the historical
   timeout's subtype and provider-side completion/billing remain unknown.

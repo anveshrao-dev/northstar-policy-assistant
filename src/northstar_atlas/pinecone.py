@@ -47,11 +47,41 @@ def main(argv=None) -> int:
             command.add_argument("--top-k", type=int, default=5)
         if name in ("search", "smoke"):
             command.add_argument("--reference-date", type=date.fromisoformat)
+    for name in ('prepare-restoration', 'restore-readiness', 'abort-restoration'):
+        command = commands.add_parser(name)
+        command.add_argument('--publication-id', required=True, help='Exact local target-directory digest.')
+        if name == 'prepare-restoration':
+            command.add_argument('--approve-preparation', action='store_true')
+        else:
+            command.add_argument('--approved-plan-sha256', required=True)
+            if name == 'restore-readiness':
+                command.add_argument('--approve-promotion', action='store_true')
+            else:
+                command.add_argument('--approved-guard-sha256', required=True)
+                command.add_argument('--approve-abort', action='store_true')
     args = parser.parse_args(argv)
     started = perf_counter()
     root, meter, stage = None, None, "startup_audit"
     try:
         root = validate_project_root(Path.cwd())
+        if args.command in ('prepare-restoration', 'restore-readiness', 'abort-restoration'):
+            from northstar_atlas.vector_store import pinecone_restoration as restoration
+            try:
+                if args.command == 'prepare-restoration':
+                    result = restoration.prepare_restoration(root, args.publication_id,
+                        approve_preparation=args.approve_preparation)
+                elif args.command == 'restore-readiness':
+                    result = restoration.apply_restoration(root, args.publication_id,
+                        approved_plan_sha256=args.approved_plan_sha256, approve_promotion=args.approve_promotion)
+                else:
+                    result = restoration.abort_restoration(root, args.publication_id,
+                        approved_plan_sha256=args.approved_plan_sha256,
+                        approved_guard_sha256=args.approved_guard_sha256, approve_abort=args.approve_abort)
+            except (Exception, KeyboardInterrupt):
+                print('Restoration stopped; preserve artifacts and guards for independent review. No retry attempted.', file=sys.stderr)
+                return 1
+            print(json.dumps(result, indent=2, allow_nan=False))
+            return 0 if result.get('outcome') in (None, 'success', 'aborted_before_promotion') else 1
         if args.command == "diagnostic-audit":
             from northstar_atlas.vector_store.pinecone_diagnostic import run_diagnostic
             result = run_diagnostic(root)

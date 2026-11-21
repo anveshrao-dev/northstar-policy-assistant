@@ -79,7 +79,7 @@ def main(argv=None):
         root = validate_project_root(Path.cwd())
         from .local_development import selected as development_selected, ENV
         if args.development:
-            if args.backend != 'chroma' or args.enable_graph:
+            if args.enable_graph:
                 raise BudgetError()
             os.environ[ENV] = '1'
         elif development_selected():

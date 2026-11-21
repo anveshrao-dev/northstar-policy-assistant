@@ -304,11 +304,16 @@ class PineconeStore:
 
     def status(self) -> dict:
         """Local publication state only: this does not claim a live remote audit."""
+        self.state.require_no_transition()
         run = self.state.read_run(self.namespace)
         if run is None: return {"state": "incomplete", "namespace": self.namespace, "remote_audited": False}
         self._owned(run)
-        return {"state": "ready" if run["state"] == "ready" and self.state.active() == self.namespace else "incomplete",
-                "namespace": self.namespace, "count": run["count"], "remote_audited": False}
+        result = {"state": "ready" if run["state"] == "ready" and self.state.active() == self.namespace else "incomplete",
+                  "namespace": self.namespace, "count": run["count"], "remote_audited": False}
+        # A restoration may have started after the first check and promoted the
+        # manifest while its receipt/guard transition is still incomplete.
+        self.state.require_no_transition()
+        return result
 
     def audit(self) -> None:
         """Explicit startup/evaluation integrity audit; reads every remote record."""

@@ -30,7 +30,7 @@ class PublicationState:
             raise VectorStoreError("publication state contains a symlink")
 
     @contextmanager
-    def lock(self):
+    def lock(self, *, allow_restoration_pending: bool = False):
         self.check_paths()
         self.path.mkdir(parents=True, exist_ok=True)
         with (self.path / "writer.lock").open("a") as stream:
@@ -39,9 +39,16 @@ class PublicationState:
             except BlockingIOError:
                 raise VectorStoreError("another local writer holds the publication lock") from None
             try:
+                if not allow_restoration_pending:
+                    self.require_no_transition()
                 yield
             finally:
                 fcntl.flock(stream, fcntl.LOCK_UN)
+
+    def require_no_transition(self):
+        self.check_paths()
+        if (self.path / 'restoration.pending').exists():
+            raise VectorStoreError('publication restoration pending; explicit review required')
 
     @staticmethod
     def validate_namespace(namespace: str) -> None:
@@ -92,6 +99,7 @@ class PublicationState:
         return namespace
 
     def publish(self, namespace: str) -> None:
+        self.require_no_transition()
         run = self.read_run(namespace)
         if run is None or run.get("state") != "ready":
             raise VectorStoreError("cannot publish an incomplete generation")

@@ -159,7 +159,9 @@ def main() -> None:
             elif workflow == LANGGRAPH_WORKFLOW:
                 st.caption('LangGraph requires a full durable workflow reservation. Budget, pricing, evidence and private-access checks must pass before execution.')
         if development_live:
-            st.caption('Local development · Standard RAG · Chroma · monthly pricing review')
+            from northstar_atlas.live_access import local_backend
+            selected_label = 'Pinecone' if local_backend() == 'pinecone' else 'Chroma'
+            st.caption(f'Local development · Standard RAG · {selected_label} · monthly pricing review')
             if development is None:
                 st.warning('Development authorization or current pricing is unavailable. Paid questions are disabled.')
             else:
@@ -193,7 +195,8 @@ def main() -> None:
                                                    'draft_review': 'Approved + proposed drafts'}[v])
         backends = ('chroma', 'pinecone') if pinecone_enabled and not retrieval_only else ('chroma',)
         if development_live:
-            backends = ('chroma',)
+            from northstar_atlas.live_access import local_backend
+            backends = (local_backend() or 'chroma',)
         elif batch_live:
             backends = ('pinecone',)
         elif one_shot_live and one_shot is not None:
