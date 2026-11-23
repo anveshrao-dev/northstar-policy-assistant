@@ -33,6 +33,9 @@ HR-001 v1.0 is approved synthetic evidence, effective 2026-10-01. IT-001, PLAT-0
 SRE-001, SEC-001 and COMP-001 are proposed synthetic drafts. They represent their
 respective departments' responsibilities, not effective rules of a real company.
 
+The proposed statuses are intentional synthetic fixtures used to test governance
+and draft-review behavior; they do not indicate unfinished application development.
+
 `approved_only` permits effective approved sources on the selected reference date.
 `draft_review` also permits proposed sources and retains their labels. A reference
 from an approved document to a draft does not approve the draft. The

@@ -24,7 +24,7 @@ live execution has not been verified. All policies are synthetic.
 
 ## How it works
 
-![Standard RAG architecture: six synthetic policies become 189 MiniLM records; eligible evidence supports controlled Nebius generation and citation validation.](docs/assets/standard-rag-architecture.png)
+![Standard RAG architecture showing six synthetic policies (one approved HR baseline and five proposed drafts), MiniLM embeddings, Chroma or Pinecone retrieval, and controlled Nebius generation and evidence validation.](docs/assets/standard-rag-architecture.png)
 
 *Both demonstrated Mac paths use pinned local MiniLM embeddings and controlled
 Nebius generation, with Chroma or an independently approved Pinecone publication
@@ -77,6 +77,11 @@ truncation.
 | SRE-001 — Incident Response & Escalation | SRE | v0.1, Proposed |
 | SEC-001 — Privileged Access & MFA | Information Security | v0.1, Proposed |
 | COMP-001 — Access Review & Audit Evidence | Compliance | v0.1, Proposed |
+
+Policy status is intentional synthetic test data: HR-001 is the approved baseline;
+IT-001, PLAT-001, SRE-001, SEC-001 and COMP-001 remain proposed so the application
+can demonstrate approved-only versus draft-review governance. Proposed does not
+mean the application is unfinished.
 
 **`approved_only`** admits approved policies effective on the reference date.
 **`draft_review`** also admits proposed drafts, preserving their labels in evidence
