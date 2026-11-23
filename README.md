@@ -24,6 +24,14 @@ live execution has not been verified. All policies are synthetic.
 
 ## How it works
 
+### Visual walkthrough
+
+![How Northstar Atlas works: a hand-drawn, six-step overview of policy documents, heading-aware chunking, MiniLM embeddings, Chroma or Pinecone retrieval, Nebius Qwen generation, and cited answers](docs/assets/how-northstar-atlas-works.webp)
+
+*The illustration is a friendly overview, not an exhaustive system diagram. Indexing happens before a user asks a question: six synthetic policy documents become **151 canonical chunks** and **189 embedding-ready records**. At question time, Streamlit checks the policy scope and controlled-live authorization, MiniLM embeds the query, Chroma **or** Pinecone retrieves relevant passages, and Qwen on Nebius generates a response. The app verifies source/citation and quotation consistency and preserves policy approval labels; these checks **do not guarantee** that every generated claim is correct or complete.*
+
+### Technical architecture
+
 ![Standard RAG architecture showing six synthetic policies (one approved HR baseline and five proposed drafts), MiniLM embeddings, Chroma or Pinecone retrieval, and controlled Nebius generation and evidence validation.](docs/assets/standard-rag-architecture.png)
 
 *Both demonstrated Mac paths use pinned local MiniLM embeddings and controlled
