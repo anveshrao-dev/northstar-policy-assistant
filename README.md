@@ -388,6 +388,13 @@ for unrestricted production policy advice.
 [Architecture and experiments](docs/README.md) · [Source](src/northstar_atlas/) ·
 [Tests](tests/) · [Evaluation assets](evaluations/)
 
+## Connect
+
+I'm a Cloud/DevOps Engineer expanding my work into AI engineering, RAG, and agentic applications.
+
+- [LinkedIn](https://www.linkedin.com/in/anv-8033/)
+- [GitHub](https://github.com/anveshrao-dev)
+
 ## Copyright and Permissions
 
 Copyright © 2026 Anvesh Rao. All rights reserved.
